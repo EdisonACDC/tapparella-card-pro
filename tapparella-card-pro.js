@@ -32,7 +32,7 @@
         },
         { name: 'camera_entity', label: 'Entità telecamera (se scegli telecamera)', selector: { entity: { domain: 'camera' } } },
         { name: 'background_image', label: 'URL immagine (se scegli immagine)', selector: { text: {} } },
-        { name: 'camera_refresh', label: 'Aggiornamento telecamera (secondi, default 5)', selector: { number: { min: 1, max: 60, step: 1 } } },
+        { name: 'camera_refresh', label: 'Aggiornamento telecamera in secondi (0 = disabilitato)', selector: { number: { min: 0, max: 60, step: 1 } } },
       ];
     }
 
@@ -103,18 +103,15 @@
       if (!camState) return null;
       // entity_picture già include il token di autenticazione
       const pic = camState.attributes.entity_picture;
-      if (pic) {
-        // Aggiunge timestamp per forzare aggiornamento immagine
-        const sep = pic.includes('?') ? '&' : '?';
-        return pic + sep + 't=' + Date.now();
-      }
+      if (pic) return pic;
       return null;
     }
 
     _setupRefresh() {
       if (this._refreshTimer) clearInterval(this._refreshTimer);
       if (this._config.background_type === 'camera') {
-        const interval = (this._config.camera_refresh || 5) * 1000;
+        const interval = (this._config.camera_refresh ?? 0) * 1000;
+      if (interval === 0) return; // 0 = nessun aggiornamento automatico
         this._refreshTimer = setInterval(() => {
           const img = this.shadowRoot.getElementById('cam-img');
           if (img) {
