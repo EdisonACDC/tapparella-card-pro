@@ -71,7 +71,6 @@
       this._hass = null;
       this._config = null;
       this._refreshTimer = null;
-      this._cameraToken = Date.now();
     }
 
     static getConfigElement() { return document.createElement('tapparella-card-pro-editor'); }
@@ -98,16 +97,29 @@
 
     getCardSize() { return 4; }
 
+    _getCameraUrl() {
+      if (!this._hass || !this._config.camera_entity) return null;
+      const camState = this._hass.states[this._config.camera_entity];
+      if (!camState) return null;
+      // entity_picture già include il token di autenticazione
+      const pic = camState.attributes.entity_picture;
+      if (pic) {
+        // Aggiunge timestamp per forzare aggiornamento immagine
+        const sep = pic.includes('?') ? '&' : '?';
+        return pic + sep + 't=' + Date.now();
+      }
+      return null;
+    }
+
     _setupRefresh() {
       if (this._refreshTimer) clearInterval(this._refreshTimer);
       if (this._config.background_type === 'camera') {
         const interval = (this._config.camera_refresh || 5) * 1000;
         this._refreshTimer = setInterval(() => {
-          this._cameraToken = Date.now();
           const img = this.shadowRoot.getElementById('cam-img');
           if (img) {
-            const base = img.dataset.base;
-            img.src = base + '?t=' + this._cameraToken;
+            const newUrl = this._getCameraUrl();
+            if (newUrl) img.src = newUrl;
           }
         }, interval);
       }
@@ -135,13 +147,11 @@
       this._hass.callService('cover', 'set_cover_position', { entity_id: this._config.entity, position: parseInt(pos, 10) });
     }
 
-    _getBackgroundHtml(position, windowOpen) {
-      const bgType = this._config.background_type || 'illustration';
-      const darkness = (1 - position / 100) * 0.85;
-      const slatCount = 9;
+    _buildSlats(position) {
+      const count = 9;
       const slats = [];
-      for (let i = 0; i < slatCount; i++) {
-        const sH = 100 / slatCount;
+      for (let i = 0; i < count; i++) {
+        const sH = 100 / count;
         const y = i * sH;
         const t = Math.max(0.5, sH * (1 - (position / 100) * 0.85));
         const op = 0.5 + (1 - position / 100) * 0.4;
@@ -149,22 +159,36 @@
           '<div style="position:absolute;left:0;right:0;top:' + y.toFixed(2) + '%;height:' + t.toFixed(2) + '%;background:rgba(71,85,105,' + op.toFixed(2) + ');border-radius:1px;"></div>'
         );
       }
+      return slats.join('');
+    }
 
-      if (bgType === 'camera' && this._config.camera_entity && this._hass) {
-        const camUrl = '/api/camera_proxy/' + this._config.camera_entity;
-        return `
-          <div style="position:relative;width:100%;height:180px;border-radius:10px;overflow:hidden;background:#1e293b;">
-            <img id="cam-img" src="${camUrl}?t=${this._cameraToken}"
-              data-base="${camUrl}"
-              style="width:100%;height:100%;object-fit:cover;display:block;"
-              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
-            <div style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:#94a3b8;font-size:13px;flex-direction:column;gap:8px;">
+    _getBackgroundHtml(position) {
+      const bgType = this._config.background_type || 'illustration';
+      const darkness = (1 - position / 100) * 0.75;
+      const slats = this._buildSlats(position);
+
+      if (bgType === 'camera') {
+        const camUrl = this._getCameraUrl();
+        if (camUrl) {
+          return `
+            <div style="position:relative;width:100%;height:180px;border-radius:10px;overflow:hidden;background:#1e293b;">
+              <img id="cam-img" src="${camUrl}"
+                style="width:100%;height:100%;object-fit:cover;display:block;"
+                onerror="this.style.display='none';document.getElementById('cam-err').style.display='flex'"/>
+              <div id="cam-err" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:#94a3b8;font-size:13px;flex-direction:column;gap:8px;">
+                <svg width="32" height="32" fill="none" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Telecamera non disponibile
+              </div>
+              <div style="position:absolute;inset:0;pointer-events:none;">${slats}</div>
+              <div style="position:absolute;inset:0;background:rgba(15,23,42,${darkness.toFixed(3)});pointer-events:none;"></div>
+            </div>`;
+        } else {
+          return `
+            <div style="position:relative;width:100%;height:180px;border-radius:10px;overflow:hidden;background:#1e293b;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:#94a3b8;font-size:13px;">
               <svg width="32" height="32" fill="none" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Telecamera non disponibile
-            </div>
-            <div style="position:absolute;inset:0;pointer-events:none;">${slats.join('')}</div>
-            <div style="position:absolute;inset:0;background:rgba(15,23,42,${darkness.toFixed(3)});pointer-events:none;border-radius:10px;"></div>
-          </div>`;
+              Seleziona un'entità telecamera
+            </div>`;
+        }
       }
 
       if (bgType === 'image' && this._config.background_image) {
@@ -177,24 +201,21 @@
               <svg width="32" height="32" fill="none" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke="#94a3b8" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="#94a3b8"/><path d="M21 15l-5-5L5 21" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Immagine non disponibile
             </div>
-            <div style="position:absolute;inset:0;pointer-events:none;">${slats.join('')}</div>
-            <div style="position:absolute;inset:0;background:rgba(15,23,42,${darkness.toFixed(3)});pointer-events:none;border-radius:10px;"></div>
+            <div style="position:absolute;inset:0;pointer-events:none;">${slats}</div>
+            <div style="position:absolute;inset:0;background:rgba(15,23,42,${darkness.toFixed(3)});pointer-events:none;"></div>
           </div>`;
       }
 
-      // Default: SVG illustration
-      const slatCount2 = 9;
+      // Default: illustrazione SVG
+      const slatCount = 9;
       const svgSlats = [];
-      for (let i = 0; i < slatCount2; i++) {
-        const sH = 152 / slatCount2;
+      for (let i = 0; i < slatCount; i++) {
+        const sH = 152 / slatCount;
         const y = 16 + i * sH;
         const t = Math.max(1, sH * (1 - (position / 100) * 0.82));
         const op = 0.55 + (1 - position / 100) * 0.35;
         svgSlats.push('<rect x="8" y="' + y.toFixed(1) + '" width="284" height="' + t.toFixed(1) + '" fill="#94a3b8" opacity="' + op.toFixed(2) + '"/>');
       }
-      const openPanel = windowOpen
-        ? '<g clip-path="url(#wc)"><g transform="translate(150,16) rotate(-35,0,0)"><rect x="0" y="0" width="114" height="152" fill="#bfdbfe" opacity="0.25" rx="2"/><rect x="0" y="0" width="4" height="152" fill="#94a3b8" opacity="0.6"/><rect x="110" y="0" width="4" height="152" fill="#94a3b8" opacity="0.6"/><rect x="0" y="0" width="114" height="4" fill="#94a3b8" opacity="0.6"/><rect x="0" y="74" width="114" height="4" fill="#94a3b8" opacity="0.6"/><rect x="55" y="0" width="4" height="152" fill="#94a3b8" opacity="0.4"/></g><rect x="150" y="16" width="4" height="152" fill="#64748b" opacity="0.4"/></g>'
-        : '<rect x="16" y="16" width="132" height="152" fill="none" stroke="#64748b" stroke-width="3"/><rect x="148" y="16" width="136" height="152" fill="none" stroke="#64748b" stroke-width="3"/><rect x="16" y="88" width="132" height="3" fill="#64748b" opacity="0.5"/><rect x="148" y="88" width="136" height="3" fill="#64748b" opacity="0.5"/><rect x="79" y="16" width="3" height="152" fill="#64748b" opacity="0.5"/><rect x="214" y="16" width="3" height="152" fill="#64748b" opacity="0.5"/><rect x="68" y="85" width="26" height="12" rx="3" fill="#94a3b8"/><rect x="206" y="85" width="26" height="12" rx="3" fill="#94a3b8"/>';
 
       return '<svg viewBox="0 0 300 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border-radius:10px;">'
         + '<defs>'
@@ -207,7 +228,10 @@
         + '<ellipse cx="220" cy="38" rx="28" ry="28" fill="white" opacity="0.85"/><ellipse cx="245" cy="32" rx="20" ry="20" fill="white" opacity="0.85"/><ellipse cx="195" cy="40" rx="16" ry="16" fill="white" opacity="0.7"/>'
         + '<ellipse cx="80" cy="50" rx="18" ry="18" fill="white" opacity="0.6"/><ellipse cx="98" cy="44" rx="14" ry="14" fill="white" opacity="0.6"/>'
         + '<rect x="16" y="130" width="268" height="38" fill="url(#gnd2)"/><rect x="16" y="118" width="268" height="16" fill="#86efac" opacity="0.5"/></g>'
-        + openPanel
+        + '<rect x="16" y="16" width="132" height="152" fill="none" stroke="#64748b" stroke-width="3"/><rect x="148" y="16" width="136" height="152" fill="none" stroke="#64748b" stroke-width="3"/>'
+        + '<rect x="16" y="88" width="132" height="3" fill="#64748b" opacity="0.5"/><rect x="148" y="88" width="136" height="3" fill="#64748b" opacity="0.5"/>'
+        + '<rect x="79" y="16" width="3" height="152" fill="#64748b" opacity="0.5"/><rect x="214" y="16" width="3" height="152" fill="#64748b" opacity="0.5"/>'
+        + '<rect x="68" y="85" width="26" height="12" rx="3" fill="#94a3b8"/><rect x="206" y="85" width="26" height="12" rx="3" fill="#94a3b8"/>'
         + '<rect x="8" y="8" width="4" height="164" rx="2" fill="#64748b"/><rect x="288" y="8" width="4" height="164" rx="2" fill="#64748b"/>'
         + '<rect x="8" y="8" width="284" height="4" rx="2" fill="#64748b"/><rect x="8" y="168" width="284" height="4" rx="2" fill="#64748b"/>'
         + svgSlats.join('')
@@ -286,9 +310,9 @@
           <div class="card">
             <div class="hdr">
               <div><div class="lbl">Tapparella PRO</div><div class="nm">${name}</div></div>
-              <div class="bi">${[0,1,2,3,4,5].map(() => '<div class="sl" style="height:' + Math.max(2,6-(position/100)*4) + 'px"></div>').join('')}</div>
+              <div class="bi">${[0,1,2,3,4,5].map(() => '<div class="sl" style="height:' + Math.max(2, 6 - (position / 100) * 4) + 'px"></div>').join('')}</div>
             </div>
-            <div class="wa">${this._getBackgroundHtml(position, windowOpen)}</div>
+            <div class="wa">${this._getBackgroundHtml(position)}</div>
             <div class="body">
               <div class="pr">
                 <div class="st"><div class="dot" style="background:${dotColor}"></div><span class="stxt" style="color:${dotColor}">${statusText}</span></div>
