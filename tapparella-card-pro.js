@@ -299,11 +299,11 @@
           }
           root.getElementById('zoom-out')?.addEventListener('click', () => {
             const cur = this._config.background_zoom ?? 100;
-            this._set('background_zoom', Math.max(50, cur - 10));
+            this._set('background_zoom', Math.max(50, cur - 5));
           });
           root.getElementById('zoom-in')?.addEventListener('click', () => {
             const cur = this._config.background_zoom ?? 100;
-            this._set('background_zoom', Math.min(300, cur + 10));
+            this._set('background_zoom', Math.min(300, cur + 5));
           });
         });
       }
