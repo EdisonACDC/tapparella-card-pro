@@ -283,7 +283,7 @@
 
       if (bgType === 'camera') {
         const url = this._getCameraUrl();
-        if (!url) return wrap(this._errBox(this._camIcon(), 'Seleziona un'entità telecamera'));
+        if (!url) return wrap(this._errBox(this._camIcon(), "Seleziona un'entità telecamera"));
         return wrap(`<img id="cam-img" src="${url}" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.style.display='none'"/>
           <div style="position:absolute;inset:0;pointer-events:none;">${slats}</div>
           <div style="position:absolute;inset:0;background:rgba(15,23,42,${dark.toFixed(3)});pointer-events:none;"></div>`);
@@ -291,7 +291,7 @@
 
       if (bgType === 'image') {
         const url = this._getEffectiveImageUrl();
-        if (!url) return wrap(this._errBox(this._imgIcon(), 'Seleziona un'immagine'));
+        if (!url) return wrap(this._errBox(this._imgIcon(), "Seleziona un'immagine"));
         return wrap(`<img src="${url}" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
           <div style="display:none;position:absolute;inset:0;flex-direction:column;gap:8px;">${this._errBox(this._imgIcon(), 'Immagine non disponibile')}</div>
           <div style="position:absolute;inset:0;pointer-events:none;">${slats}</div>
