@@ -269,20 +269,20 @@
         posWrap.appendChild(posSel);
         imgSection.appendChild(posWrap);
 
-        // Zoom +/-
+        // Zoom slider + input numerico
         const zoom = this._config.background_zoom ?? 100;
         const zoomWrap = document.createElement('div');
         zoomWrap.style.cssText = 'margin-top:14px';
         zoomWrap.innerHTML = '<label class="field-label">Zoom immagine</label>';
+
         const zoomRow = document.createElement('div');
-        zoomRow.className = 'zoom-row';
+        zoomRow.style.cssText = 'display:flex;align-items:center;gap:10px';
         zoomRow.innerHTML = `
-          <button class="zoom-btn" id="zoom-out" title="Riduci zoom">－</button>
-          <div style="flex:1;text-align:center">
-            <div class="zoom-val">${zoom}%</div>
-            <div style="font-size:11px;color:#9ca3af;margin-top:2px;">50% — 300%</div>
-          </div>
-          <button class="zoom-btn" id="zoom-in" title="Aumenta zoom">＋</button>
+          <input type="range" id="zoom-slider" min="50" max="300" step="1" value="${zoom}"
+            style="flex:1;height:6px;accent-color:#3b82f6;cursor:pointer">
+          <input type="number" id="zoom-number" min="50" max="300" value="${zoom}"
+            style="width:68px;padding:6px 8px;border:1.5px solid #d1d5db;border-radius:8px;font-size:14px;font-weight:600;color:#374151;text-align:center;outline:none">
+          <span style="font-size:13px;color:#6b7280;flex-shrink:0">%</span>
         `;
         zoomWrap.appendChild(zoomRow);
         imgSection.appendChild(zoomWrap);
@@ -297,13 +297,23 @@
             uploadBtn.addEventListener('click', () => fileInput.click());
             fileInput.addEventListener('change', (e) => { if (e.target.files[0]) this._handleUpload(e.target.files[0]); });
           }
-          root.getElementById('zoom-out')?.addEventListener('click', () => {
-            const cur = this._config.background_zoom ?? 100;
-            this._set('background_zoom', Math.max(50, cur - 5));
+          const slider = root.getElementById('zoom-slider');
+          const numInput = root.getElementById('zoom-number');
+          slider?.addEventListener('input', (e) => {
+            const v = parseInt(e.target.value, 10);
+            if (numInput) numInput.value = v;
+            this._setQuiet('background_zoom', v);
           });
-          root.getElementById('zoom-in')?.addEventListener('click', () => {
-            const cur = this._config.background_zoom ?? 100;
-            this._set('background_zoom', Math.min(300, cur + 5));
+          numInput?.addEventListener('input', (e) => {
+            const v = Math.min(300, Math.max(50, parseInt(e.target.value, 10) || 100));
+            if (slider) slider.value = v;
+            this._setQuiet('background_zoom', v);
+          });
+          numInput?.addEventListener('blur', (e) => {
+            const v = Math.min(300, Math.max(50, parseInt(e.target.value, 10) || 100));
+            e.target.value = v;
+            if (slider) slider.value = v;
+            this._setQuiet('background_zoom', v);
           });
         });
       }
