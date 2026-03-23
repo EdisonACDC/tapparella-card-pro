@@ -213,6 +213,43 @@
           imgSection.appendChild(err);
         }
 
+  
+        // Adattamento immagine
+        const fitSection = document.createElement('div');
+        fitSection.style.cssText = 'margin-top:14px';
+        fitSection.innerHTML = '<label class="field-label" style="display:block;font-size:12px;font-weight:500;color:#6b7280;margin-bottom:6px">Adattamento immagine</label>';
+        const fitSel = document.createElement('ha-selector');
+        fitSel.hass = this._hass;
+        fitSel.selector = { select: { options: [
+          { value: 'cover', label: '✂️ Riempie e ritaglia (default)' },
+          { value: 'contain', label: "🖼️ Mostra tutta l'immagine" },
+          { value: 'fill', label: '↔️ Adatta e deforma' },
+        ]}};
+        fitSel.value = this._config.background_fit || 'cover';
+        fitSel.label = 'Adattamento';
+        fitSel.addEventListener('value-changed', (e) => this._set('background_fit', e.detail.value));
+        fitSection.appendChild(fitSel);
+        imgSection.appendChild(fitSection);
+
+        // Posizione immagine
+        const posSection = document.createElement('div');
+        posSection.style.cssText = 'margin-top:14px';
+        posSection.innerHTML = '<label class="field-label" style="display:block;font-size:12px;font-weight:500;color:#6b7280;margin-bottom:6px">Posizione immagine</label>';
+        const posSel = document.createElement('ha-selector');
+        posSel.hass = this._hass;
+        posSel.selector = { select: { options: [
+          { value: 'center', label: '⊙ Centro (default)' },
+          { value: 'top', label: '⬆️ Alto' },
+          { value: 'bottom', label: '⬇️ Basso' },
+          { value: 'left', label: '⬅️ Sinistra' },
+          { value: 'right', label: '➡️ Destra' },
+        ]}};
+        posSel.value = this._config.background_position || 'center';
+        posSel.label = 'Posizione';
+        posSel.addEventListener('value-changed', (e) => this._set('background_position', e.detail.value));
+        posSection.appendChild(posSel);
+        imgSection.appendChild(posSection);
+
         root.appendChild(imgSection);
 
         // Wire up file input
@@ -359,7 +396,7 @@
       if (bgType === 'image') {
         const url = this._getEffectiveImageUrl();
         if (!url) return wrap(this._errBox(this._imgIcon(), "Seleziona un'immagine"));
-        return wrap(`<img src="${url}" style="width:100%;height:100%;object-fit:cover;object-position:center;display:block;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+        return wrap(`<img src="${url}" style="width:100%;height:100%;object-fit:${this._config.background_fit||'cover'};object-position:${this._config.background_position||'center'};display:block;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
           <div style="display:none;position:absolute;inset:0;flex-direction:column;gap:8px;">${this._errBox(this._imgIcon(), 'Immagine non disponibile')}</div>
           <div style="position:absolute;inset:0;pointer-events:none;">${slats}</div>
           <div style="position:absolute;inset:0;background:rgba(15,23,42,${dark.toFixed(3)});pointer-events:none;"></div>`);
