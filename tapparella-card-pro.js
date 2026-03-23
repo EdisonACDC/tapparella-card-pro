@@ -1,6 +1,6 @@
 /**
    * Tapparella Card PRO per Home Assistant
-   * Autore: EdisonACDC — v1.4.0
+   * Autore: EdisonACDC — v1.5.0
    */
 
   // ── EDITOR VISUALE PERSONALIZZATO ──────────────────────────────────────────────
@@ -10,6 +10,9 @@
       this.attachShadow({ mode: 'open' });
       this._config = {};
       this._hass = null;
+      this._uploading = false;
+      this._deleting = false;
+      this._uploadError = '';
     }
 
     setConfig(config) {
@@ -19,8 +22,7 @@
 
     set hass(hass) {
       this._hass = hass;
-      // propaga hass a tutti gli ha-selector figli
-      this.shadowRoot.querySelectorAll('ha-selector,ha-entity-picker').forEach(el => { el.hass = hass; });
+      this.shadowRoot.querySelectorAll('ha-selector').forEach(el => { el.hass = hass; });
     }
 
     connectedCallback() { this._render(); }
@@ -52,57 +54,87 @@
       return wrap;
     }
 
+    async _handleUpload(file) {
+      if (!file || !this._hass) return;
+      this._uploading = true;
+      this._uploadError = '';
+      this._render();
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const resp = await this._hass.fetchWithAuth('/api/image/upload', { method: 'POST', body: formData });
+        if (!resp.ok) throw new Error('Upload fallito: ' + resp.status);
+        const data = await resp.json();
+        const imageUrl = '/api/image/serve/' + data.id + '/original';
+        this._config = { ...this._config, background_image: imageUrl, background_image_id: data.id };
+        this._fire(this._config);
+      } catch (e) {
+        this._uploadError = e.message;
+      }
+      this._uploading = false;
+      this._render();
+    }
+
+    async _handleDelete() {
+      const imageId = this._config.background_image_id;
+      if (!imageId || !this._hass) return;
+      if (!confirm('Eliminare questa foto dal Media di Home Assistant?')) return;
+      this._deleting = true;
+      this._render();
+      try {
+        const resp = await this._hass.fetchWithAuth('/api/image/' + imageId, { method: 'DELETE' });
+        if (!resp.ok && resp.status !== 404) throw new Error('Eliminazione fallita: ' + resp.status);
+        this._config = { ...this._config, background_image: '', background_image_id: '' };
+        this._fire(this._config);
+      } catch (e) {
+        this._uploadError = e.message;
+      }
+      this._deleting = false;
+      this._render();
+    }
+
     _render() {
       const bgType = this._config.background_type || 'illustration';
       const root = this.shadowRoot;
       root.innerHTML = `<style>
         :host{display:block;padding:4px 0}
         .section{margin-bottom:16px}
-        label{display:block;font-size:12px;font-weight:500;color:#6b7280;margin-bottom:6px}
+        label.field-label{display:block;font-size:12px;font-weight:500;color:#6b7280;margin-bottom:6px}
         .radio-group{display:flex;flex-direction:column;gap:8px}
         .radio-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:10px;cursor:pointer;transition:border-color .15s,background .15s}
         .radio-row.active{border-color:#3b82f6;background:#eff6ff}
         .radio-row input{accent-color:#3b82f6;width:18px;height:18px;cursor:pointer}
         .radio-row span{font-size:14px;font-weight:500;color:#374151}
-        .note{font-size:12px;color:#6b7280;margin-top:6px;padding:8px 10px;background:#f9fafb;border-radius:8px;line-height:1.5}
+        .upload-area{border:2px dashed #d1d5db;border-radius:12px;padding:20px;text-align:center;margin-bottom:12px;background:#f9fafb;transition:border-color .15s}
+        .upload-area:hover{border-color:#3b82f6;background:#eff6ff}
+        .upload-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#3b82f6;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s}
+        .upload-btn:hover{background:#2563eb}
+        .upload-btn:disabled{background:#9ca3af;cursor:not-allowed}
+        .delete-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:#fee2e2;color:#dc2626;border:1.5px solid #fca5a5;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .15s}
+        .delete-btn:hover{background:#fecaca}
+        .delete-btn:disabled{opacity:.5;cursor:not-allowed}
+        .preview-img{width:100%;height:120px;object-fit:cover;border-radius:10px;margin-bottom:8px;border:1px solid #e5e7eb}
+        .error{color:#dc2626;font-size:12px;margin-top:6px;padding:6px 10px;background:#fee2e2;border-radius:6px}
+        .note{font-size:12px;color:#6b7280;margin-top:8px;padding:8px 10px;background:#f9fafb;border-radius:8px;line-height:1.5}
+        .spinner{display:inline-block;width:16px;height:16px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle}
+        @keyframes spin{to{transform:rotate(360deg)}}
       </style>`;
 
-      // Entità tapparella
-      root.appendChild(this._makeSelector(
-        'Entità tapparella (cover) *',
-        { entity: { domain: 'cover' } },
-        this._config.entity,
-        'entity'
-      ));
+      root.appendChild(this._makeSelector('Entità tapparella (cover) *', { entity: { domain: 'cover' } }, this._config.entity, 'entity'));
+      root.appendChild(this._makeSelector('Nome visualizzato (opzionale)', { text: {} }, this._config.name, 'name'));
+      root.appendChild(this._makeSelector('Sensore finestra (opzionale)', { entity: { domain: 'binary_sensor' } }, this._config.window_entity, 'window_entity'));
 
-      // Nome
-      root.appendChild(this._makeSelector(
-        'Nome visualizzato (opzionale)',
-        { text: {} },
-        this._config.name,
-        'name'
-      ));
-
-      // Sensore finestra
-      root.appendChild(this._makeSelector(
-        'Sensore finestra (opzionale)',
-        { entity: { domain: 'binary_sensor' } },
-        this._config.window_entity,
-        'window_entity'
-      ));
-
-      // Tipo di sfondo
+      // Tipo sfondo
       const bgSection = document.createElement('div');
       bgSection.className = 'section';
-      bgSection.innerHTML = '<label>Tipo di sfondo</label>';
-      const radioGroup = document.createElement('div');
-      radioGroup.className = 'radio-group';
-      const options = [
+      bgSection.innerHTML = '<label class="field-label">Tipo di sfondo</label>';
+      const rg = document.createElement('div');
+      rg.className = 'radio-group';
+      [
         { value: 'illustration', icon: '🎨', label: 'Illustrazione SVG (default)' },
         { value: 'camera', icon: '📷', label: 'Telecamera Home Assistant' },
-        { value: 'image', icon: '🖼️', label: 'Immagine da libreria o URL' },
-      ];
-      options.forEach(opt => {
+        { value: 'image', icon: '🖼️', label: 'Immagine personale' },
+      ].forEach(opt => {
         const row = document.createElement('label');
         row.className = 'radio-row' + (bgType === opt.value ? ' active' : '');
         row.innerHTML = `<input type="radio" name="bgtype" value="${opt.value}" ${bgType === opt.value ? 'checked' : ''}><span>${opt.icon} ${opt.label}</span>`;
@@ -111,55 +143,90 @@
           this._fire(this._config);
           this._render();
         });
-        radioGroup.appendChild(row);
+        rg.appendChild(row);
       });
-      bgSection.appendChild(radioGroup);
+      bgSection.appendChild(rg);
       root.appendChild(bgSection);
 
       // Campi condizionali
       if (bgType === 'camera') {
-        root.appendChild(this._makeSelector(
-          'Entità telecamera',
-          { entity: { domain: 'camera' } },
-          this._config.camera_entity,
-          'camera_entity'
-        ));
-        root.appendChild(this._makeSelector(
-          'Aggiornamento automatico in secondi (0 = disabilitato)',
-          { number: { min: 0, max: 60, step: 1, mode: 'slider' } },
-          this._config.camera_refresh ?? 0,
-          'camera_refresh'
-        ));
+        root.appendChild(this._makeSelector('Entità telecamera', { entity: { domain: 'camera' } }, this._config.camera_entity, 'camera_entity'));
+        root.appendChild(this._makeSelector('Aggiornamento automatico in secondi (0 = disabilitato)', { number: { min: 0, max: 60, step: 1, mode: 'slider' } }, this._config.camera_refresh ?? 0, 'camera_refresh'));
       }
 
       if (bgType === 'image') {
-        // Picker media nativo HA
-        root.appendChild(this._makeSelector(
-          'Scegli immagine dalla libreria multimediale',
-          { media: {} },
-          this._config.background_image ?? null,
-          'background_image'
-        ));
+        const imgSection = document.createElement('div');
+        imgSection.className = 'section';
+        imgSection.innerHTML = '<label class="field-label">Immagine di sfondo</label>';
 
-        // URL manuale come fallback
-        const urlSection = document.createElement('div');
-        urlSection.className = 'section';
-        urlSection.innerHTML = '<label>Oppure inserisci un URL manuale</label>';
-        const urlInput = document.createElement('ha-selector');
-        urlInput.hass = this._hass;
-        urlInput.selector = { text: { type: 'url' } };
-        urlInput.value = typeof this._config.background_image === 'string' && !this._config.background_image.startsWith('media-source://') ? this._config.background_image : '';
-        urlInput.label = 'URL immagine (es: /local/foto/immagine.jpg)';
-        urlInput.addEventListener('value-changed', (e) => {
-          if (e.detail.value) this._set('background_image', e.detail.value);
+        // Preview se c'è un'immagine
+        const currentImg = this._config.background_image;
+        if (currentImg) {
+          const prev = document.createElement('img');
+          prev.className = 'preview-img';
+          prev.src = currentImg;
+          prev.onerror = () => { prev.style.display = 'none'; };
+          imgSection.appendChild(prev);
+        }
+
+        // Area upload
+        const uploadArea = document.createElement('div');
+        uploadArea.className = 'upload-area';
+        uploadArea.innerHTML = `
+          <div style="font-size:13px;color:#6b7280;margin-bottom:12px;">
+            ${currentImg ? 'Carica una nuova foto per sostituirla' : 'Carica una foto dal tuo dispositivo'}
+          </div>
+          <button class="upload-btn" id="upload-btn" ${this._uploading ? 'disabled' : ''}>
+            ${this._uploading ? '<span class="spinner"></span> Caricamento...' : '📁 Scegli foto'}
+          </button>
+          <input type="file" id="file-input" accept="image/*" style="display:none">
+          <div style="font-size:12px;color:#9ca3af;margin-top:8px;">Supporta JPEG, PNG, WebP, HEIC e altri formati</div>
+        `;
+        imgSection.appendChild(uploadArea);
+
+        // Pulsante elimina (solo se immagine caricata tramite card)
+        if (currentImg && this._config.background_image_id) {
+          const delBtn = document.createElement('button');
+          delBtn.className = 'delete-btn';
+          delBtn.disabled = this._deleting;
+          delBtn.innerHTML = this._deleting ? '<span class="spinner" style="border-color:#dc2626;border-top-color:transparent"></span> Eliminazione...' : '🗑️ Elimina foto dal Media';
+          delBtn.addEventListener('click', () => this._handleDelete());
+          imgSection.appendChild(delBtn);
+        } else if (currentImg && !this._config.background_image_id) {
+          // Pulsante per rimuovere solo dalla card (senza eliminare da HA)
+          const clearBtn = document.createElement('button');
+          clearBtn.className = 'delete-btn';
+          clearBtn.innerHTML = '✕ Rimuovi immagine dalla card';
+          clearBtn.addEventListener('click', () => {
+            this._config = { ...this._config, background_image: '', background_image_id: '' };
+            this._fire(this._config);
+            this._render();
+          });
+          imgSection.appendChild(clearBtn);
+        }
+
+        // Errore
+        if (this._uploadError) {
+          const err = document.createElement('div');
+          err.className = 'error';
+          err.textContent = this._uploadError;
+          imgSection.appendChild(err);
+        }
+
+        root.appendChild(imgSection);
+
+        // Wire up file input
+        requestAnimationFrame(() => {
+          const uploadBtn = root.getElementById('upload-btn');
+          const fileInput = root.getElementById('file-input');
+          if (uploadBtn && fileInput) {
+            uploadBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => {
+              const file = e.target.files[0];
+              if (file) this._handleUpload(file);
+            });
+          }
         });
-        urlSection.appendChild(urlInput);
-
-        const note = document.createElement('div');
-        note.className = 'note';
-        note.textContent = 'Foto nella cartella www: usa il percorso /local/nomefile.jpg';
-        urlSection.appendChild(note);
-        root.appendChild(urlSection);
       }
     }
   }
