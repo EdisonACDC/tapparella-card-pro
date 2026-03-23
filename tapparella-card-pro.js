@@ -1,6 +1,6 @@
 /**
    * Tapparella Card PRO per Home Assistant
-   * Autore: EdisonACDC — v1.5.0
+   * Autore: EdisonACDC — v1.6.0
    */
 
   // ── EDITOR VISUALE PERSONALIZZATO ──────────────────────────────────────────────
@@ -31,13 +31,20 @@
       this.dispatchEvent(new CustomEvent('config-changed', { detail: { config }, bubbles: true, composed: true }));
     }
 
+    // Re-renderizza (solo per cambi strutturali come background_type)
     _set(key, value) {
       this._config = { ...this._config, [key]: value };
       this._fire(this._config);
       this._render();
     }
 
-    _makeSelector(label, selectorDef, value, key) {
+    // Aggiorna config senza re-renderizzare (per campi testo e numerici)
+    _setQuiet(key, value) {
+      this._config = { ...this._config, [key]: value };
+      this._fire(this._config);
+    }
+
+    _makeEntitySelector(label, domain, value, key) {
       const wrap = document.createElement('div');
       wrap.style.cssText = 'margin-bottom:16px';
       const lbl = document.createElement('label');
@@ -45,10 +52,10 @@
       lbl.style.cssText = 'display:block;font-size:12px;font-weight:500;color:#6b7280;margin-bottom:6px';
       const sel = document.createElement('ha-selector');
       sel.hass = this._hass;
-      sel.selector = selectorDef;
+      sel.selector = { entity: { domain } };
       sel.value = value ?? null;
       sel.label = label;
-      sel.addEventListener('value-changed', (e) => this._set(key, e.detail.value));
+      sel.addEventListener('value-changed', (e) => this._setQuiet(key, e.detail.value));
       wrap.appendChild(lbl);
       wrap.appendChild(sel);
       return wrap;
@@ -96,33 +103,52 @@
     _render() {
       const bgType = this._config.background_type || 'illustration';
       const root = this.shadowRoot;
+
       root.innerHTML = `<style>
         :host{display:block;padding:4px 0}
         .section{margin-bottom:16px}
-        label.field-label{display:block;font-size:12px;font-weight:500;color:#6b7280;margin-bottom:6px}
+        .field-label{display:block;font-size:12px;font-weight:500;color:#6b7280;margin-bottom:6px}
+        .text-input{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;color:#111827;background:#fff;outline:none;transition:border-color .15s}
+        .text-input:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
         .radio-group{display:flex;flex-direction:column;gap:8px}
         .radio-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:10px;cursor:pointer;transition:border-color .15s,background .15s}
         .radio-row.active{border-color:#3b82f6;background:#eff6ff}
         .radio-row input{accent-color:#3b82f6;width:18px;height:18px;cursor:pointer}
         .radio-row span{font-size:14px;font-weight:500;color:#374151}
-        .upload-area{border:2px dashed #d1d5db;border-radius:12px;padding:20px;text-align:center;margin-bottom:12px;background:#f9fafb;transition:border-color .15s}
-        .upload-area:hover{border-color:#3b82f6;background:#eff6ff}
-        .upload-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#3b82f6;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s}
-        .upload-btn:hover{background:#2563eb}
+        .upload-area{border:2px dashed #d1d5db;border-radius:12px;padding:20px;text-align:center;margin-bottom:12px;background:#f9fafb}
+        .upload-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#3b82f6;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
         .upload-btn:disabled{background:#9ca3af;cursor:not-allowed}
-        .delete-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:#fee2e2;color:#dc2626;border:1.5px solid #fca5a5;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .15s}
-        .delete-btn:hover{background:#fecaca}
-        .delete-btn:disabled{opacity:.5;cursor:not-allowed}
+        .delete-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:#fee2e2;color:#dc2626;border:1.5px solid #fca5a5;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px}
         .preview-img{width:100%;height:120px;object-fit:cover;border-radius:10px;margin-bottom:8px;border:1px solid #e5e7eb}
         .error{color:#dc2626;font-size:12px;margin-top:6px;padding:6px 10px;background:#fee2e2;border-radius:6px}
-        .note{font-size:12px;color:#6b7280;margin-top:8px;padding:8px 10px;background:#f9fafb;border-radius:8px;line-height:1.5}
+        .zoom-row{display:flex;align-items:center;gap:10px;margin-top:14px}
+        .zoom-btn{width:36px;height:36px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;font-size:20px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#374151;flex-shrink:0;transition:background .15s}
+        .zoom-btn:hover{background:#f3f4f6}
+        .zoom-val{flex:1;text-align:center;font-size:14px;font-weight:600;color:#374151}
+        .zoom-bar{flex:1;height:6px;background:#e5e7eb;border-radius:3px;position:relative;cursor:pointer}
+        .zoom-fill{height:100%;border-radius:3px;background:#3b82f6}
         .spinner{display:inline-block;width:16px;height:16px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle}
         @keyframes spin{to{transform:rotate(360deg)}}
       </style>`;
 
-      root.appendChild(this._makeSelector('Entità tapparella (cover) *', { entity: { domain: 'cover' } }, this._config.entity, 'entity'));
-      root.appendChild(this._makeSelector('Nome visualizzato (opzionale)', { text: {} }, this._config.name, 'name'));
-      root.appendChild(this._makeSelector('Sensore finestra (opzionale)', { entity: { domain: 'binary_sensor' } }, this._config.window_entity, 'window_entity'));
+      // Nome — input nativo (no re-render su ogni tasto)
+      const nameWrap = document.createElement('div');
+      nameWrap.style.cssText = 'margin-bottom:16px';
+      nameWrap.innerHTML = '<label class="field-label">Nome visualizzato (opzionale)</label>';
+      const nameInput = document.createElement('input');
+      nameInput.className = 'text-input';
+      nameInput.type = 'text';
+      nameInput.placeholder = 'Es: Soggiorno';
+      nameInput.value = this._config.name || '';
+      nameInput.addEventListener('input', (e) => this._setQuiet('name', e.target.value));
+      nameWrap.appendChild(nameInput);
+      root.appendChild(nameWrap);
+
+      // Entità tapparella
+      root.appendChild(this._makeEntitySelector('Entità tapparella (cover) *', 'cover', this._config.entity, 'entity'));
+
+      // Sensore finestra
+      root.appendChild(this._makeEntitySelector('Sensore finestra (opzionale)', 'binary_sensor', this._config.window_entity, 'window_entity'));
 
       // Tipo sfondo
       const bgSection = document.createElement('div');
@@ -138,28 +164,33 @@
         const row = document.createElement('label');
         row.className = 'radio-row' + (bgType === opt.value ? ' active' : '');
         row.innerHTML = `<input type="radio" name="bgtype" value="${opt.value}" ${bgType === opt.value ? 'checked' : ''}><span>${opt.icon} ${opt.label}</span>`;
-        row.querySelector('input').addEventListener('change', () => {
-          this._config = { ...this._config, background_type: opt.value };
-          this._fire(this._config);
-          this._render();
-        });
+        row.querySelector('input').addEventListener('change', () => this._set('background_type', opt.value));
         rg.appendChild(row);
       });
       bgSection.appendChild(rg);
       root.appendChild(bgSection);
 
-      // Campi condizionali
+      // ── Telecamera ──
       if (bgType === 'camera') {
-        root.appendChild(this._makeSelector('Entità telecamera', { entity: { domain: 'camera' } }, this._config.camera_entity, 'camera_entity'));
-        root.appendChild(this._makeSelector('Aggiornamento automatico in secondi (0 = disabilitato)', { number: { min: 0, max: 60, step: 1, mode: 'slider' } }, this._config.camera_refresh ?? 0, 'camera_refresh'));
+        root.appendChild(this._makeEntitySelector('Entità telecamera', 'camera', this._config.camera_entity, 'camera_entity'));
+        const refreshWrap = document.createElement('div');
+        refreshWrap.style.cssText = 'margin-bottom:16px';
+        refreshWrap.innerHTML = '<label class="field-label">Aggiornamento automatico (secondi, 0 = disabilitato)</label>';
+        const refreshSel = document.createElement('ha-selector');
+        refreshSel.hass = this._hass;
+        refreshSel.selector = { number: { min: 0, max: 60, step: 1, mode: 'slider' } };
+        refreshSel.value = this._config.camera_refresh ?? 0;
+        refreshSel.addEventListener('value-changed', (e) => this._setQuiet('camera_refresh', e.detail.value));
+        refreshWrap.appendChild(refreshSel);
+        root.appendChild(refreshWrap);
       }
 
+      // ── Immagine ──
       if (bgType === 'image') {
         const imgSection = document.createElement('div');
         imgSection.className = 'section';
         imgSection.innerHTML = '<label class="field-label">Immagine di sfondo</label>';
 
-        // Preview se c'è un'immagine
         const currentImg = this._config.background_image;
         if (currentImg) {
           const prev = document.createElement('img');
@@ -169,22 +200,19 @@
           imgSection.appendChild(prev);
         }
 
-        // Area upload
+        // Upload area
         const uploadArea = document.createElement('div');
         uploadArea.className = 'upload-area';
         uploadArea.innerHTML = `
-          <div style="font-size:13px;color:#6b7280;margin-bottom:12px;">
-            ${currentImg ? 'Carica una nuova foto per sostituirla' : 'Carica una foto dal tuo dispositivo'}
-          </div>
+          <div style="font-size:13px;color:#6b7280;margin-bottom:12px;">${currentImg ? "Sostituisci con un'altra foto" : 'Carica una foto dal tuo dispositivo'}</div>
           <button class="upload-btn" id="upload-btn" ${this._uploading ? 'disabled' : ''}>
             ${this._uploading ? '<span class="spinner"></span> Caricamento...' : '📁 Scegli foto'}
           </button>
           <input type="file" id="file-input" accept="image/*" style="display:none">
-          <div style="font-size:12px;color:#9ca3af;margin-top:8px;">Supporta JPEG, PNG, WebP, HEIC e altri formati</div>
+          <div style="font-size:12px;color:#9ca3af;margin-top:8px;">JPEG, PNG, WebP, HEIC e altri formati</div>
         `;
         imgSection.appendChild(uploadArea);
 
-        // Pulsante elimina (solo se immagine caricata tramite card)
         if (currentImg && this._config.background_image_id) {
           const delBtn = document.createElement('button');
           delBtn.className = 'delete-btn';
@@ -192,20 +220,14 @@
           delBtn.innerHTML = this._deleting ? '<span class="spinner" style="border-color:#dc2626;border-top-color:transparent"></span> Eliminazione...' : '🗑️ Elimina foto dal Media';
           delBtn.addEventListener('click', () => this._handleDelete());
           imgSection.appendChild(delBtn);
-        } else if (currentImg && !this._config.background_image_id) {
-          // Pulsante per rimuovere solo dalla card (senza eliminare da HA)
+        } else if (currentImg) {
           const clearBtn = document.createElement('button');
           clearBtn.className = 'delete-btn';
-          clearBtn.innerHTML = '✕ Rimuovi immagine dalla card';
-          clearBtn.addEventListener('click', () => {
-            this._config = { ...this._config, background_image: '', background_image_id: '' };
-            this._fire(this._config);
-            this._render();
-          });
+          clearBtn.innerHTML = '✕ Rimuovi dalla card';
+          clearBtn.addEventListener('click', () => this._set('background_image', ''));
           imgSection.appendChild(clearBtn);
         }
 
-        // Errore
         if (this._uploadError) {
           const err = document.createElement('div');
           err.className = 'error';
@@ -213,28 +235,26 @@
           imgSection.appendChild(err);
         }
 
-  
-        // Adattamento immagine
-        const fitSection = document.createElement('div');
-        fitSection.style.cssText = 'margin-top:14px';
-        fitSection.innerHTML = '<label class="field-label" style="display:block;font-size:12px;font-weight:500;color:#6b7280;margin-bottom:6px">Adattamento immagine</label>';
+        // Adattamento
+        const fitWrap = document.createElement('div');
+        fitWrap.style.cssText = 'margin-top:16px';
+        fitWrap.innerHTML = '<label class="field-label">Adattamento immagine</label>';
         const fitSel = document.createElement('ha-selector');
         fitSel.hass = this._hass;
         fitSel.selector = { select: { options: [
-          { value: 'cover', label: '✂️ Riempie e ritaglia (default)' },
+          { value: 'cover', label: "✂️ Riempie e ritaglia (default)" },
           { value: 'contain', label: "🖼️ Mostra tutta l'immagine" },
           { value: 'fill', label: '↔️ Adatta e deforma' },
         ]}};
         fitSel.value = this._config.background_fit || 'cover';
-        fitSel.label = 'Adattamento';
-        fitSel.addEventListener('value-changed', (e) => this._set('background_fit', e.detail.value));
-        fitSection.appendChild(fitSel);
-        imgSection.appendChild(fitSection);
+        fitSel.addEventListener('value-changed', (e) => this._setQuiet('background_fit', e.detail.value));
+        fitWrap.appendChild(fitSel);
+        imgSection.appendChild(fitWrap);
 
-        // Posizione immagine
-        const posSection = document.createElement('div');
-        posSection.style.cssText = 'margin-top:14px';
-        posSection.innerHTML = '<label class="field-label" style="display:block;font-size:12px;font-weight:500;color:#6b7280;margin-bottom:6px">Posizione immagine</label>';
+        // Posizione
+        const posWrap = document.createElement('div');
+        posWrap.style.cssText = 'margin-top:14px';
+        posWrap.innerHTML = '<label class="field-label">Posizione immagine</label>';
         const posSel = document.createElement('ha-selector');
         posSel.hass = this._hass;
         posSel.selector = { select: { options: [
@@ -245,24 +265,46 @@
           { value: 'right', label: '➡️ Destra' },
         ]}};
         posSel.value = this._config.background_position || 'center';
-        posSel.label = 'Posizione';
-        posSel.addEventListener('value-changed', (e) => this._set('background_position', e.detail.value));
-        posSection.appendChild(posSel);
-        imgSection.appendChild(posSection);
+        posSel.addEventListener('value-changed', (e) => this._setQuiet('background_position', e.detail.value));
+        posWrap.appendChild(posSel);
+        imgSection.appendChild(posWrap);
+
+        // Zoom +/-
+        const zoom = this._config.background_zoom ?? 100;
+        const zoomWrap = document.createElement('div');
+        zoomWrap.style.cssText = 'margin-top:14px';
+        zoomWrap.innerHTML = '<label class="field-label">Zoom immagine</label>';
+        const zoomRow = document.createElement('div');
+        zoomRow.className = 'zoom-row';
+        zoomRow.innerHTML = `
+          <button class="zoom-btn" id="zoom-out" title="Riduci zoom">－</button>
+          <div style="flex:1;text-align:center">
+            <div class="zoom-val">${zoom}%</div>
+            <div style="font-size:11px;color:#9ca3af;margin-top:2px;">50% — 300%</div>
+          </div>
+          <button class="zoom-btn" id="zoom-in" title="Aumenta zoom">＋</button>
+        `;
+        zoomWrap.appendChild(zoomRow);
+        imgSection.appendChild(zoomWrap);
 
         root.appendChild(imgSection);
 
-        // Wire up file input
+        // Wire up events
         requestAnimationFrame(() => {
           const uploadBtn = root.getElementById('upload-btn');
           const fileInput = root.getElementById('file-input');
           if (uploadBtn && fileInput) {
             uploadBtn.addEventListener('click', () => fileInput.click());
-            fileInput.addEventListener('change', (e) => {
-              const file = e.target.files[0];
-              if (file) this._handleUpload(file);
-            });
+            fileInput.addEventListener('change', (e) => { if (e.target.files[0]) this._handleUpload(e.target.files[0]); });
           }
+          root.getElementById('zoom-out')?.addEventListener('click', () => {
+            const cur = this._config.background_zoom ?? 100;
+            this._set('background_zoom', Math.max(50, cur - 10));
+          });
+          root.getElementById('zoom-in')?.addEventListener('click', () => {
+            const cur = this._config.background_zoom ?? 100;
+            this._set('background_zoom', Math.min(300, cur + 10));
+          });
         });
       }
     }
@@ -396,7 +438,7 @@
       if (bgType === 'image') {
         const url = this._getEffectiveImageUrl();
         if (!url) return wrap(this._errBox(this._imgIcon(), "Seleziona un'immagine"));
-        return wrap(`<img src="${url}" style="width:100%;height:100%;object-fit:${this._config.background_fit||'cover'};object-position:${this._config.background_position||'center'};display:block;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+        return wrap(`<img src="${url}" style="width:100%;height:100%;object-fit:${this._config.background_fit||'cover'};object-position:${this._config.background_position||'center'};display:block;transform:scale(${(this._config.background_zoom||100)/100});transform-origin:${this._config.background_position||'center'};transition:transform .2s;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
           <div style="display:none;position:absolute;inset:0;flex-direction:column;gap:8px;">${this._errBox(this._imgIcon(), 'Immagine non disponibile')}</div>
           <div style="position:absolute;inset:0;pointer-events:none;">${slats}</div>
           <div style="position:absolute;inset:0;background:rgba(15,23,42,${dark.toFixed(3)});pointer-events:none;"></div>`);
