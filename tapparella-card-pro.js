@@ -1,6 +1,6 @@
 /**
    * Tapparella Card PRO per Home Assistant
-   * Sfondo: telecamera HA oppure immagine personalizzata
+   * Sfondo: telecamera HA oppure immagine da Media Sources o URL
    * Autore: EdisonACDC
    */
 
@@ -23,15 +23,15 @@
           name: 'background_type', label: 'Tipo di sfondo', selector: {
             select: {
               options: [
-                { value: 'illustration', label: '🎨 Illustrazione SVG (default)' },
-                { value: 'camera', label: '📷 Telecamera Home Assistant' },
-                { value: 'image', label: '🖼️ Immagine personalizzata (URL)' },
+                { value: 'illustration', label: 'Illustrazione SVG (default)' },
+                { value: 'camera', label: 'Telecamera Home Assistant' },
+                { value: 'image', label: 'Immagine (Media Sources o URL)' },
               ]
             }
           }
         },
         { name: 'camera_entity', label: 'Entità telecamera (se scegli telecamera)', selector: { entity: { domain: 'camera' } } },
-        { name: 'background_image', label: 'URL immagine (se scegli immagine)', selector: { text: {} } },
+        { name: 'background_image', label: 'Immagine di sfondo (se scegli immagine)', selector: { image: {} } },
         { name: 'camera_refresh', label: 'Aggiornamento telecamera in secondi (0 = disabilitato)', selector: { number: { min: 0, max: 60, step: 1 } } },
       ];
     }
@@ -71,6 +71,8 @@
       this._hass = null;
       this._config = null;
       this._refreshTimer = null;
+      this._resolvedImageUrl = null;
+      this._lastImageSrc = null;
     }
 
     static getConfigElement() { return document.createElement('tapparella-card-pro-editor'); }
@@ -81,13 +83,19 @@
 
     setConfig(config) {
       if (!config.entity) throw new Error('Devi specificare entity');
+      const prevImg = this._config?.background_image;
       this._config = config;
+      if (config.background_image !== prevImg) {
+        this._resolvedImageUrl = null;
+        this._resolveImageIfNeeded();
+      }
       this._setupRefresh();
       this._render();
     }
 
     set hass(hass) {
       this._hass = hass;
+      this._resolveImageIfNeeded();
       this._render();
     }
 
@@ -97,26 +105,47 @@
 
     getCardSize() { return 4; }
 
+    // Risolve URL media-source:// in URL HTTP accessibili
+    async _resolveImageIfNeeded() {
+      if (!this._hass || !this._config) return;
+      const src = this._config.background_image;
+      if (!src || src === this._lastImageSrc) return;
+      this._lastImageSrc = src;
+      if (src.startsWith('media-source://')) {
+        try {
+          const result = await this._hass.callWS({ type: 'media_source/resolve_media', media_content_id: src });
+          this._resolvedImageUrl = result.url;
+          this._render();
+        } catch (e) {
+          console.warn('[TapparellaCardPro] impossibile risolvere media-source:', e);
+          this._resolvedImageUrl = null;
+        }
+      } else {
+        this._resolvedImageUrl = src;
+      }
+    }
+
+    _getEffectiveImageUrl() {
+      return this._resolvedImageUrl || this._config?.background_image || null;
+    }
+
     _getCameraUrl() {
       if (!this._hass || !this._config.camera_entity) return null;
       const camState = this._hass.states[this._config.camera_entity];
       if (!camState) return null;
-      // entity_picture già include il token di autenticazione
-      const pic = camState.attributes.entity_picture;
-      if (pic) return pic;
-      return null;
+      return camState.attributes.entity_picture || null;
     }
 
     _setupRefresh() {
       if (this._refreshTimer) clearInterval(this._refreshTimer);
       if (this._config.background_type === 'camera') {
         const interval = (this._config.camera_refresh ?? 0) * 1000;
-      if (interval === 0) return; // 0 = nessun aggiornamento automatico
+        if (interval === 0) return;
         this._refreshTimer = setInterval(() => {
           const img = this.shadowRoot.getElementById('cam-img');
           if (img) {
             const newUrl = this._getCameraUrl();
-            if (newUrl) img.src = newUrl;
+            if (newUrl) img.src = newUrl + '?t=' + Date.now();
           }
         }, interval);
       }
@@ -152,9 +181,7 @@
         const y = i * sH;
         const t = Math.max(0.5, sH * (1 - (position / 100) * 0.85));
         const op = 0.5 + (1 - position / 100) * 0.4;
-        slats.push(
-          '<div style="position:absolute;left:0;right:0;top:' + y.toFixed(2) + '%;height:' + t.toFixed(2) + '%;background:rgba(71,85,105,' + op.toFixed(2) + ');border-radius:1px;"></div>'
-        );
+        slats.push('<div style="position:absolute;left:0;right:0;top:' + y.toFixed(2) + '%;height:' + t.toFixed(2) + '%;background:rgba(71,85,105,' + op.toFixed(2) + ');border-radius:1px;"></div>');
       }
       return slats.join('');
     }
@@ -164,71 +191,63 @@
       const darkness = (1 - position / 100) * 0.75;
       const slats = this._buildSlats(position);
 
+      // ── TELECAMERA ──
       if (bgType === 'camera') {
         const camUrl = this._getCameraUrl();
         if (camUrl) {
-          return `
-            <div style="position:relative;width:100%;height:180px;border-radius:10px;overflow:hidden;background:#1e293b;">
-              <img id="cam-img" src="${camUrl}"
-                style="width:100%;height:100%;object-fit:cover;display:block;"
-                onerror="this.style.display='none';document.getElementById('cam-err').style.display='flex'"/>
-              <div id="cam-err" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:#94a3b8;font-size:13px;flex-direction:column;gap:8px;">
-                <svg width="32" height="32" fill="none" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Telecamera non disponibile
-              </div>
-              <div style="position:absolute;inset:0;pointer-events:none;">${slats}</div>
-              <div style="position:absolute;inset:0;background:rgba(15,23,42,${darkness.toFixed(3)});pointer-events:none;"></div>
-            </div>`;
-        } else {
-          return `
-            <div style="position:relative;width:100%;height:180px;border-radius:10px;overflow:hidden;background:#1e293b;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:#94a3b8;font-size:13px;">
-              <svg width="32" height="32" fill="none" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Seleziona un'entità telecamera
-            </div>`;
-        }
-      }
-
-      if (bgType === 'image' && this._config.background_image) {
-        return `
-          <div style="position:relative;width:100%;height:180px;border-radius:10px;overflow:hidden;background:#1e293b;">
-            <img src="${this._config.background_image}"
-              style="width:100%;height:100%;object-fit:cover;display:block;"
+          return `<div style="position:relative;width:100%;height:180px;border-radius:10px;overflow:hidden;background:#1e293b;">
+            <img id="cam-img" src="${camUrl}" style="width:100%;height:100%;object-fit:cover;display:block;"
               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
             <div style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:#94a3b8;font-size:13px;flex-direction:column;gap:8px;">
-              <svg width="32" height="32" fill="none" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke="#94a3b8" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="#94a3b8"/><path d="M21 15l-5-5L5 21" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Immagine non disponibile
-            </div>
+              <svg width="32" height="32" fill="none" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Telecamera non disponibile</div>
             <div style="position:absolute;inset:0;pointer-events:none;">${slats}</div>
             <div style="position:absolute;inset:0;background:rgba(15,23,42,${darkness.toFixed(3)});pointer-events:none;"></div>
           </div>`;
+        }
+        return `<div style="position:relative;width:100%;height:180px;border-radius:10px;overflow:hidden;background:#1e293b;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:#94a3b8;font-size:13px;">
+          <svg width="32" height="32" fill="none" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Seleziona un'entità telecamera</div>`;
       }
 
-      // Default: illustrazione SVG
-      const slatCount = 9;
+      // ── IMMAGINE (Media Sources o URL) ──
+      if (bgType === 'image') {
+        const imgUrl = this._getEffectiveImageUrl();
+        if (imgUrl) {
+          return `<div style="position:relative;width:100%;height:180px;border-radius:10px;overflow:hidden;background:#1e293b;">
+            <img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover;display:block;"
+              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+            <div style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;color:#94a3b8;font-size:13px;flex-direction:column;gap:8px;">
+              <svg width="32" height="32" fill="none" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke="#94a3b8" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="#94a3b8"/><path d="M21 15l-5-5L5 21" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Immagine non disponibile</div>
+            <div style="position:absolute;inset:0;pointer-events:none;">${slats}</div>
+            <div style="position:absolute;inset:0;background:rgba(15,23,42,${darkness.toFixed(3)});pointer-events:none;"></div>
+          </div>`;
+        }
+        return `<div style="position:relative;width:100%;height:180px;border-radius:10px;overflow:hidden;background:#1e293b;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:#94a3b8;font-size:13px;">
+          <svg width="32" height="32" fill="none" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" stroke="#94a3b8" stroke-width="1.5"/><circle cx="8.5" cy="8.5" r="1.5" fill="#94a3b8"/><path d="M21 15l-5-5L5 21" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Seleziona un'immagine</div>`;
+      }
+
+      // ── ILLUSTRAZIONE SVG (default) ──
       const svgSlats = [];
-      for (let i = 0; i < slatCount; i++) {
-        const sH = 152 / slatCount;
+      for (let i = 0; i < 9; i++) {
+        const sH = 152 / 9;
         const y = 16 + i * sH;
         const t = Math.max(1, sH * (1 - (position / 100) * 0.82));
         const op = 0.55 + (1 - position / 100) * 0.35;
         svgSlats.push('<rect x="8" y="' + y.toFixed(1) + '" width="284" height="' + t.toFixed(1) + '" fill="#94a3b8" opacity="' + op.toFixed(2) + '"/>');
       }
-
       return '<svg viewBox="0 0 300 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border-radius:10px;">'
-        + '<defs>'
-        + '<linearGradient id="sky2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#60a5fa"/><stop offset="60%" stop-color="#93c5fd"/><stop offset="100%" stop-color="#bfdbfe"/></linearGradient>'
+        + '<defs><linearGradient id="sky2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#60a5fa"/><stop offset="60%" stop-color="#93c5fd"/><stop offset="100%" stop-color="#bfdbfe"/></linearGradient>'
         + '<linearGradient id="gnd2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4ade80"/><stop offset="100%" stop-color="#16a34a"/></linearGradient>'
-        + '<clipPath id="wc"><rect x="16" y="16" width="268" height="152" rx="4"/></clipPath>'
-        + '</defs>'
+        + '<clipPath id="wc"><rect x="16" y="16" width="268" height="152" rx="4"/></clipPath></defs>'
         + '<rect x="0" y="0" width="300" height="180" fill="#e2e8f0"/>'
         + '<g clip-path="url(#wc)"><rect x="16" y="16" width="268" height="152" fill="url(#sky2)"/>'
         + '<ellipse cx="220" cy="38" rx="28" ry="28" fill="white" opacity="0.85"/><ellipse cx="245" cy="32" rx="20" ry="20" fill="white" opacity="0.85"/><ellipse cx="195" cy="40" rx="16" ry="16" fill="white" opacity="0.7"/>'
         + '<ellipse cx="80" cy="50" rx="18" ry="18" fill="white" opacity="0.6"/><ellipse cx="98" cy="44" rx="14" ry="14" fill="white" opacity="0.6"/>'
-        + '<rect x="16" y="130" width="268" height="38" fill="url(#gnd2)"/><rect x="16" y="118" width="268" height="16" fill="#86efac" opacity="0.5"/></g>'
+        + '<rect x="16" y="130" width="268" height="38" fill="url(#gnd2)"/></g>'
         + '<rect x="16" y="16" width="132" height="152" fill="none" stroke="#64748b" stroke-width="3"/><rect x="148" y="16" width="136" height="152" fill="none" stroke="#64748b" stroke-width="3"/>'
-        + '<rect x="16" y="88" width="132" height="3" fill="#64748b" opacity="0.5"/><rect x="148" y="88" width="136" height="3" fill="#64748b" opacity="0.5"/>'
-        + '<rect x="79" y="16" width="3" height="152" fill="#64748b" opacity="0.5"/><rect x="214" y="16" width="3" height="152" fill="#64748b" opacity="0.5"/>'
-        + '<rect x="68" y="85" width="26" height="12" rx="3" fill="#94a3b8"/><rect x="206" y="85" width="26" height="12" rx="3" fill="#94a3b8"/>'
         + '<rect x="8" y="8" width="4" height="164" rx="2" fill="#64748b"/><rect x="288" y="8" width="4" height="164" rx="2" fill="#64748b"/>'
         + '<rect x="8" y="8" width="284" height="4" rx="2" fill="#64748b"/><rect x="8" y="168" width="284" height="4" rx="2" fill="#64748b"/>'
         + svgSlats.join('')
@@ -251,17 +270,10 @@
         : '<rect x="1" y="1" width="20" height="20" rx="2" stroke="#94a3b8" stroke-width="1.5" fill="#f1f5f9"/><line x1="11" y1="1" x2="11" y2="21" stroke="#94a3b8" stroke-width="1.2"/><line x1="1" y1="11" x2="21" y2="11" stroke="#94a3b8" stroke-width="1.2"/>';
 
       const windowSection = hasWindow ? `
-        <div class="win-row">
-          <div class="win-info">
-            <div class="win-ic ${windowOpen ? 'open' : ''}">
-              <svg width="20" height="20" viewBox="0 0 22 22" fill="none">${winIcon}</svg>
-            </div>
-            <div>
-              <div class="win-lbl">Finestra</div>
-              <div class="win-st ${windowOpen ? 'open' : ''}">${windowOpen ? 'Aperta' : 'Chiusa'}</div>
-            </div>
-          </div>
-        </div>
+        <div class="win-row"><div class="win-info">
+          <div class="win-ic ${windowOpen ? 'open' : ''}"><svg width="20" height="20" viewBox="0 0 22 22" fill="none">${winIcon}</svg></div>
+          <div><div class="win-lbl">Finestra</div><div class="win-st ${windowOpen ? 'open' : ''}">${windowOpen ? 'Aperta' : 'Chiusa'}</div></div>
+        </div></div>
         ${windowOpen && position < 20 ? '<div class="warn">⚠️ Attenzione: finestra aperta con tapparella quasi chiusa!</div>' : ''}
       ` : '';
 
@@ -318,9 +330,7 @@
               <div>
                 <div class="bar-labels"><span>Chiusa</span><span>Apertura</span><span>Aperta</span></div>
                 <div class="slider-wrap">
-                  <div class="bar-track">
-                    <div class="bar-fill" id="bfill" style="width:${position}%;background:${barColor}"></div>
-                  </div>
+                  <div class="bar-track"><div class="bar-fill" id="bfill" style="width:${position}%;background:${barColor}"></div></div>
                   <input type="range" class="slider-input" id="slider" min="0" max="100" step="1" value="${position}">
                   <div class="thumb" id="thumb" style="left:calc(${position}% - 11px)"></div>
                 </div>
@@ -342,11 +352,9 @@
       const thumb  = this.shadowRoot.getElementById('thumb');
       const pctEl  = this.shadowRoot.querySelector('.pct');
       const gc = (v) => v === 0 ? '#94a3b8' : v < 50 ? '#34d399' : v < 100 ? '#fbbf24' : '#fb923c';
-
       slider?.addEventListener('input', (e) => {
         const v = parseInt(e.target.value, 10);
-        bfill.style.width = v + '%';
-        bfill.style.background = gc(v);
+        bfill.style.width = v + '%'; bfill.style.background = gc(v);
         thumb.style.left = 'calc(' + v + '% - 11px)';
         pctEl.innerHTML = v + '<span>%</span>';
       });
@@ -359,10 +367,5 @@
 
   customElements.define('tapparella-card-pro', TapparellaCardPro);
   window.customCards = window.customCards || [];
-  window.customCards.push({
-    type: 'tapparella-card-pro',
-    name: 'Tapparella Card PRO',
-    description: 'Card tapparelle con sfondo telecamera o immagine personalizzata',
-    preview: true,
-  });
+  window.customCards.push({ type: 'tapparella-card-pro', name: 'Tapparella Card PRO', description: 'Card tapparelle con sfondo telecamera o immagine da Media Sources', preview: true });
   
