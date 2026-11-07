@@ -1,0 +1,29 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-06T10:00:00Z" },
+  "title": "Tapparella Card PRO — Mockup",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 390, "h": 844, "title": "Illustrazione · Parziale 45%" },
+    "Chiusa.dc.html": { "x": 450, "y": 0, "w": 390, "h": 844, "title": "Illustrazione · Chiusa 0%" },
+    "Aperta.dc.html": { "x": 900, "y": 0, "w": 390, "h": 844, "title": "Illustrazione · Aperta 100%" },
+    "Telecamera.dc.html": { "x": 0, "y": 920, "w": 390, "h": 844, "title": "Sfondo telecamera · 45%" },
+    "Avviso.dc.html": { "x": 450, "y": 920, "w": 390, "h": 844, "title": "Avviso finestra aperta · 10%" },
+    "Editor.dc.html": { "x": 900, "y": 920, "w": 390, "h": 1400, "title": "Editor · Immagine personale" },
+    "Animata.dc.html": { "x": 0, "y": 1840, "w": 390, "h": 844, "title": "Animata · Tapparella che sale e scende" }
+  },
+  "order": [
+    "Main.dc.html",
+    "Chiusa.dc.html",
+    "Aperta.dc.html",
+    "Telecamera.dc.html",
+    "Avviso.dc.html",
+    "Editor.dc.html",
+    "Animata.dc.html"
+  ],
+  "notes": {
+    "titolo": { "x": 0, "y": -300, "text": "Tapparella Card PRO — stati della card e editor (formato telefono)", "kind": "title1", "maxW": 1290 }
+  },
+  "designSystems": []
+}
