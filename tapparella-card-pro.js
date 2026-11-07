@@ -170,6 +170,23 @@
       bgSection.appendChild(rg);
       root.appendChild(bgSection);
 
+      // ── Lato della barra di posizione ──
+      const barSection = document.createElement('div');
+      barSection.style.cssText = 'margin-bottom:16px';
+      barSection.innerHTML = '<label class="field-label">Barra di posizione</label>';
+      const barPos = this._config.bar_position || 'right';
+      [
+        { value: 'left', label: '⬅️ Sinistra della finestra' },
+        { value: 'right', label: '➡️ Destra della finestra (default)' },
+      ].forEach(opt => {
+        const row = document.createElement('label');
+        row.className = 'radio-row' + (barPos === opt.value ? ' active' : '');
+        row.innerHTML = `<input type="radio" name="barpos" value="${opt.value}" ${barPos === opt.value ? 'checked' : ''}><span>${opt.label}</span>`;
+        row.querySelector('input').addEventListener('change', () => this._set('bar_position', opt.value));
+        barSection.appendChild(row);
+      });
+      root.appendChild(barSection);
+
       // ── Telecamera ──
       if (bgType === 'camera') {
         root.appendChild(this._makeEntitySelector('Entità telecamera', 'camera', this._config.camera_entity, 'camera_entity'));
@@ -499,6 +516,18 @@
         ${winOpen && pos < 20 ? '<div class="warn">⚠️ Finestra aperta con tapparella quasi chiusa!</div>' : ''}
       ` : '';
 
+      const barLeft = this._config.bar_position === 'left';
+      const bgHtml = `<div class="bgw">${this._getBackgroundHtml(pos)}</div>`;
+      const vbarHtml = `
+        <div class="vbar">
+          <span class="vl">Aperta</span>
+          <div class="vtrack" id="vtrack">
+            <div class="vfill" id="vfill" style="height:${pos}%;background:${barColor}"></div>
+            <div class="vknob" id="vknob" style="bottom:calc(${pos}% - 11px)"></div>
+          </div>
+          <span class="vl">Chiusa</span>
+        </div>`;
+
       this.shadowRoot.innerHTML = `
         <style>
           :host{display:block}
@@ -516,12 +545,13 @@
           .stxt{font-size:14px;font-weight:600}
           .pct{font-size:32px;font-weight:700;color:#1e293b}
           .pct span{font-size:18px;color:#94a3b8;font-weight:500}
-          .slider-wrap{position:relative;height:28px;display:flex;align-items:center}
-          .bar-track{position:absolute;left:0;right:0;height:14px;background:#f1f5f9;border-radius:7px;overflow:hidden;box-shadow:inset 0 1px 3px rgba(0,0,0,.1)}
-          .bar-fill{height:100%;border-radius:7px;transition:width .15s}
-          .slider-input{position:absolute;left:0;right:0;top:0;bottom:0;width:100%;height:100%;opacity:0;cursor:pointer;margin:0;padding:0}
-          .thumb{position:absolute;top:50%;transform:translateY(-50%);width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2);border:2px solid #cbd5e1;pointer-events:none;transition:left .15s}
-          .bar-labels{display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-bottom:4px}
+          .row{display:flex;gap:12px;align-items:stretch}
+          .bgw{flex:1;min-width:0}
+          .vbar{width:40px;height:180px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:space-between}
+          .vl{font-size:10px;color:#94a3b8}
+          .vtrack{position:relative;flex:1;width:26px;margin:4px 0;border-radius:13px;background:#f1f5f9;box-shadow:inset 0 1px 3px rgba(0,0,0,.12);cursor:pointer;touch-action:none;user-select:none}
+          .vfill{position:absolute;left:0;right:0;bottom:0;border-radius:13px;transition:height .15s}
+          .vknob{position:absolute;left:50%;transform:translateX(-50%);width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2);border:2px solid #cbd5e1;box-sizing:border-box;pointer-events:none;transition:bottom .15s}
           .br{display:flex;gap:8px}
           .btn{flex:1;padding:8px 4px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;font-size:13px;font-weight:500;cursor:pointer;transition:background .15s}
           .btn:hover{background:#f8fafc}
@@ -543,19 +573,11 @@
               <div><div class="lbl">Tapparella PRO</div><div class="nm">${name}</div></div>
               <div class="bi">${[0,1,2,3,4,5].map(() => `<div class="sl" style="height:${Math.max(2, 6 - pos / 100 * 4)}px"></div>`).join('')}</div>
             </div>
-            <div class="wa">${this._getBackgroundHtml(pos)}</div>
+            <div class="wa"><div class="row">${barLeft ? vbarHtml + bgHtml : bgHtml + vbarHtml}</div></div>
             <div class="body">
               <div class="pr">
                 <div class="st"><div class="dot" style="background:${dotColor}"></div><span class="stxt" style="color:${dotColor}">${statusText}</span></div>
                 <div class="pct">${pos}<span>%</span></div>
-              </div>
-              <div>
-                <div class="bar-labels"><span>Chiusa</span><span>Apertura</span><span>Aperta</span></div>
-                <div class="slider-wrap">
-                  <div class="bar-track"><div class="bar-fill" id="bfill" style="width:${pos}%;background:${barColor}"></div></div>
-                  <input type="range" class="slider-input" id="slider" min="0" max="100" step="1" value="${pos}">
-                  <div class="thumb" id="thumb" style="left:calc(${pos}% - 11px)"></div>
-                </div>
               </div>
               <div class="br">
                 <button class="btn" id="bc">Chiudi</button>
@@ -569,17 +591,39 @@
           </div>
         </ha-card>`;
 
-      const slider = this.shadowRoot.getElementById('slider');
-      const bfill = this.shadowRoot.getElementById('bfill');
-      const thumb = this.shadowRoot.getElementById('thumb');
+      // Barra verticale: trascinamento con il puntatore (mouse, touch, penna)
+      const track = this.shadowRoot.getElementById('vtrack');
+      const vfill = this.shadowRoot.getElementById('vfill');
+      const vknob = this.shadowRoot.getElementById('vknob');
       const pctEl = this.shadowRoot.querySelector('.pct');
-      slider?.addEventListener('input', (e) => {
-        const v = parseInt(e.target.value, 10);
-        bfill.style.width = v + '%'; bfill.style.background = gc(v);
-        thumb.style.left = 'calc(' + v + '% - 11px)';
+      const showVal = (v) => {
+        vfill.style.height = v + '%'; vfill.style.background = gc(v);
+        vknob.style.bottom = 'calc(' + v + '% - 11px)';
         pctEl.innerHTML = v + '<span>%</span>';
+      };
+      const valFromEvent = (e) => {
+        const r = track.getBoundingClientRect();
+        const y = Math.min(Math.max(e.clientY - r.top, 0), r.height);
+        return Math.round((1 - y / r.height) * 100);
+      };
+      let dragV = null;
+      track?.addEventListener('pointerdown', (e) => {
+        track.setPointerCapture(e.pointerId);
+        dragV = valFromEvent(e);
+        showVal(dragV);
       });
-      slider?.addEventListener('change', (e) => this._setPosition(e.target.value));
+      track?.addEventListener('pointermove', (e) => {
+        if (dragV === null) return;
+        dragV = valFromEvent(e);
+        showVal(dragV);
+      });
+      track?.addEventListener('pointerup', () => {
+        if (dragV === null) return;
+        const v = dragV;
+        dragV = null;
+        this._setPosition(v);
+      });
+      track?.addEventListener('pointercancel', () => { dragV = null; this._render(); });
       this.shadowRoot.getElementById('bc')?.addEventListener('click', () => this._callService('close_cover'));
       this.shadowRoot.getElementById('bs')?.addEventListener('click', () => this._callService('stop_cover'));
       this.shadowRoot.getElementById('bo')?.addEventListener('click', () => this._callService('open_cover'));
