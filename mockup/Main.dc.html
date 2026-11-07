@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Home Assistant — Tapparella Card PRO</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;font-family:Roboto,"Segoe UI",system-ui,sans-serif}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:#f5f5f5;display:flex;flex-direction:column;color:#1c1c1c">
+  <div style="height:56px;box-sizing:border-box;background:#03a9f4;color:#fff;display:flex;align-items:center;padding:0 16px;gap:20px;box-shadow:0 2px 4px rgba(0,0,0,.2)">
+    <svg width="24" height="24" viewBox="0 0 24 24"><path fill="#fff" d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    <span style="font-size:20px;font-weight:500;flex:1">Soggiorno</span>
+    <svg width="24" height="24" viewBox="0 0 24 24"><path fill="#fff" d="M12 8a2 2 0 110-4 2 2 0 010 4zm0 2a2 2 0 110 4 2 2 0 010-4zm0 6a2 2 0 110 4 2 2 0 010-4z"/></svg>
+  </div>
+
+  <div style="padding:12px;display:flex;flex-direction:column;gap:12px">
+    <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.12)">
+      <div style="background:linear-gradient(135deg,#334155,#1e293b);padding:14px 18px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Tapparella PRO</div>
+          <div style="font-size:18px;font-weight:600;color:#fff">Soggiorno</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px;padding:6px;background:rgba(255,255,255,.1);border-radius:10px">
+          <sc-for list="{{bars}}" as="b">
+            <div style="width:36px;height:{{b.h}}px;background:#cbd5e1;border-radius:2px"></div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="padding:12px 14px 0">
+        <div style="position:relative;width:100%;height:180px;border-radius:10px;overflow:hidden;background:#1e293b">
+          <svg viewBox="0 0 300 180" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%;display:block">
+            <defs>
+              <linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#60a5fa"/><stop offset="60%" stop-color="#93c5fd"/><stop offset="100%" stop-color="#bfdbfe"/></linearGradient>
+              <linearGradient id="gn" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4ade80"/><stop offset="100%" stop-color="#16a34a"/></linearGradient>
+              <clipPath id="wc"><rect x="16" y="16" width="268" height="152" rx="4"/></clipPath>
+            </defs>
+            <rect width="300" height="180" fill="#e2e8f0"/>
+            <g clip-path="url(#wc)">
+              <rect x="16" y="16" width="268" height="152" fill="url(#sk)"/>
+              <ellipse cx="220" cy="38" rx="28" ry="28" fill="white" opacity=".85"/>
+              <ellipse cx="245" cy="32" rx="20" ry="20" fill="white" opacity=".85"/>
+              <ellipse cx="80" cy="50" rx="18" ry="18" fill="white" opacity=".6"/>
+              <rect x="16" y="130" width="268" height="38" fill="url(#gn)"/>
+            </g>
+            <rect x="16" y="16" width="132" height="152" fill="none" stroke="#64748b" stroke-width="3"/>
+            <rect x="148" y="16" width="136" height="152" fill="none" stroke="#64748b" stroke-width="3"/>
+            <rect x="8" y="8" width="4" height="164" rx="2" fill="#64748b"/>
+            <rect x="288" y="8" width="4" height="164" rx="2" fill="#64748b"/>
+            <rect x="8" y="8" width="284" height="4" rx="2" fill="#64748b"/>
+            <rect x="8" y="168" width="284" height="4" rx="2" fill="#64748b"/>
+            <sc-for list="{{slats}}" as="s">
+              <rect x="8" y="{{s.y}}" width="284" height="{{s.h}}" fill="#94a3b8" opacity="{{s.op}}"/>
+            </sc-for>
+            <rect x="16" y="16" width="268" height="152" fill="rgba(15,23,42,{{overlay}})"/>
+            <rect x="8" y="8" width="284" height="8" rx="3" fill="#475569"/>
+            <rect x="140" y="2" width="20" height="12" rx="2" fill="#334155"/>
+          </svg>
+        </div>
+      </div>
+
+      <div style="padding:14px 18px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:10px;height:10px;border-radius:50%;background:{{dotColor}}"></div>
+            <span style="font-size:14px;font-weight:600;color:{{dotColor}}">{{status}}</span>
+          </div>
+          <div style="font-size:32px;font-weight:700;color:#1e293b">{{pos}}<span style="font-size:18px;color:#94a3b8;font-weight:500">%</span></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-bottom:4px"><span>Chiusa</span><span>Apertura</span><span>Aperta</span></div>
+          <div style="position:relative;height:28px;display:flex;align-items:center">
+            <div style="position:absolute;left:0;right:0;height:14px;background:#f1f5f9;border-radius:7px;overflow:hidden;box-shadow:inset 0 1px 3px rgba(0,0,0,.1)">
+              <div style="height:100%;width:{{pos}}%;background:{{barColor}};border-radius:7px"></div>
+            </div>
+            <div style="position:absolute;top:50%;transform:translateY(-50%);left:calc({{pos}}% - 11px);width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.2);border:2px solid #cbd5e1"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <div style="flex:1;padding:8px 4px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;font-size:13px;font-weight:500;text-align:center">Chiudi</div>
+          <div style="flex:1;padding:8px 4px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;font-size:13px;font-weight:500;text-align:center">Stop</div>
+          <div style="flex:1;padding:8px 4px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;color:#475569;font-size:13px;font-weight:500;text-align:center">Apri</div>
+        </div>
+        <div style="height:1px;background:#f1f5f9"></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center">
+            <svg width="20" height="20" viewBox="0 0 22 22" fill="none"><rect x="1" y="1" width="20" height="20" rx="2" stroke="#94a3b8" stroke-width="1.5" fill="#f1f5f9"/><line x1="11" y1="1" x2="11" y2="21" stroke="#94a3b8" stroke-width="1.2"/><line x1="1" y1="11" x2="21" y2="11" stroke="#94a3b8" stroke-width="1.2"/></svg>
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:500;color:#334155">Finestra</div>
+            <div style="font-size:12px;font-weight:600;color:#94a3b8">Chiusa</div>
+          </div>
+        </div>
+      </div>
+      <div style="background:#f8fafc;padding:10px 18px;display:flex;justify-content:space-between;border-top:1px solid #f1f5f9">
+        <span style="font-size:12px;color:#94a3b8">Ultima posizione</span>
+        <span style="font-size:12px;color:#94a3b8">{{pos}}%</span>
+      </div>
+    </div>
+
+    <div style="background:#fff;border-radius:16px;padding:8px 16px;box-shadow:0 2px 12px rgba(0,0,0,.08)">
+      <div style="display:flex;align-items:center;gap:14px;height:52px;border-bottom:1px solid #f1f1f1">
+        <div style="width:36px;height:36px;border-radius:50%;background:#fff3e0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#e65100">CU</div>
+        <div style="flex:1;font-size:15px">Cucina</div>
+        <div style="font-size:14px;color:#757575">Chiusa · 0%</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;height:52px">
+        <div style="width:36px;height:36px;border-radius:50%;background:#e3f2fd;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#1565c0">CA</div>
+        <div style="flex:1;font-size:15px">Camera da letto</div>
+        <div style="font-size:14px;color:#757575">Aperta · 100%</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"pos":{"editor":"range","default":45,"min":0,"max":100,"step":1,"unit":"%"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props.pos ?? 45;
+    const sH = 152 / 9;
+    const slats = Array.from({ length: 9 }, (_, i) => ({
+      y: (16 + i * sH).toFixed(1),
+      h: Math.max(1, sH * (1 - p / 100 * 0.82)).toFixed(1),
+      op: (0.55 + (1 - p / 100) * 0.35).toFixed(2),
+    }));
+    const bars = [0, 1, 2, 3, 4, 5].map(() => ({ h: Math.max(2, 6 - p / 100 * 4).toFixed(1) }));
+    const dotColor = p === 0 ? '#94a3b8' : p === 100 ? '#fb923c' : '#34d399';
+    const barColor = p === 0 ? '#94a3b8' : p < 50 ? '#34d399' : p < 100 ? '#fbbf24' : '#fb923c';
+    const status = p === 0 ? 'Chiusa' : p === 100 ? 'Aperta' : 'Parziale';
+    return { pos: p, slats, bars, dotColor, barColor, status, overlay: ((1 - p / 100) * 0.82).toFixed(2) };
+  }
+}
+</script>
+</body>
+</html>
