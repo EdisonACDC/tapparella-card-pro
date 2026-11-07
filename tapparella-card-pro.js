@@ -322,7 +322,10 @@
             this._setQuiet('background_zoom', v);
           });
           numInput?.addEventListener('input', (e) => {
-            const v = Math.min(300, Math.max(50, parseInt(e.target.value, 10) || 100));
+            // Mentre si scrive non si riscrive il campo: si applica solo il valore valido
+            const raw = parseInt(e.target.value, 10);
+            if (isNaN(raw)) return;
+            const v = Math.min(300, Math.max(50, raw));
             if (slider) slider.value = v;
             this._setQuiet('background_zoom', v);
           });
@@ -368,6 +371,8 @@
 
     set hass(hass) {
       this._hass = hass;
+      // Mentre si scrive nel campo percentuale non si ridisegna la card
+      if (this._editing) return;
       this._resolveImageIfNeeded();
       this._render();
     }
@@ -545,6 +550,9 @@
           .stxt{font-size:14px;font-weight:600}
           .pct{font-size:32px;font-weight:700;color:#1e293b}
           .pct span{font-size:18px;color:#94a3b8;font-weight:500}
+          .pct-in{width:76px;font-size:32px;font-weight:700;color:#1e293b;border:none;border-bottom:2px solid transparent;background:transparent;text-align:right;padding:0;margin:0;font-family:inherit;outline:none;-moz-appearance:textfield}
+          .pct-in:focus{border-bottom-color:#3b82f6}
+          .pct-in::-webkit-outer-spin-button,.pct-in::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
           .row{display:flex;gap:12px;align-items:stretch}
           .bgw{flex:1;min-width:0}
           .vbar{width:40px;height:180px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:space-between}
@@ -577,7 +585,7 @@
             <div class="body">
               <div class="pr">
                 <div class="st"><div class="dot" style="background:${dotColor}"></div><span class="stxt" style="color:${dotColor}">${statusText}</span></div>
-                <div class="pct">${pos}<span>%</span></div>
+                <div class="pct"><input type="number" id="pct-in" class="pct-in" min="0" max="100" step="1" value="${pos}" inputmode="numeric" aria-label="Posizione in percentuale"><span>%</span></div>
               </div>
               <div class="br">
                 <button class="btn" id="bc">Chiudi</button>
@@ -595,12 +603,25 @@
       const track = this.shadowRoot.getElementById('vtrack');
       const vfill = this.shadowRoot.getElementById('vfill');
       const vknob = this.shadowRoot.getElementById('vknob');
-      const pctEl = this.shadowRoot.querySelector('.pct');
+      const pctIn = this.shadowRoot.getElementById('pct-in');
       const showVal = (v) => {
         vfill.style.height = v + '%'; vfill.style.background = gc(v);
         vknob.style.bottom = 'calc(' + v + '% - 11px)';
-        pctEl.innerHTML = v + '<span>%</span>';
+        if (pctIn && pctIn !== this.shadowRoot.activeElement) pctIn.value = v;
       };
+      // Campo numerico: si scrive liberamente, il valore si applica con Invio o uscendo dal campo
+      pctIn?.addEventListener('focus', () => { this._editing = true; });
+      pctIn?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); pctIn.blur(); } });
+      pctIn?.addEventListener('blur', () => {
+        this._editing = false;
+        const raw = parseInt(pctIn.value, 10);
+        if (isNaN(raw)) { pctIn.value = pos; return; }
+        const v = Math.min(100, Math.max(0, raw));
+        pctIn.value = v;
+        if (v === pos) return;
+        showVal(v);
+        this._setPosition(v);
+      });
       const valFromEvent = (e) => {
         const r = track.getBoundingClientRect();
         const y = Math.min(Math.max(e.clientY - r.top, 0), r.height);
