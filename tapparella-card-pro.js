@@ -16,8 +16,13 @@
     }
 
     setConfig(config) {
+      const prevType = this._config?.background_type || 'illustration';
       this._config = { ...config };
-      this._render();
+      // Ridisegna solo se cambia la struttura: ogni tasto nel campo Nome fa tornare qui,
+      // e un ridisegno ricreerebbe il campo facendogli perdere il focus
+      if (!this._rendered || prevType !== (config.background_type || 'illustration')) {
+        this._render();
+      }
     }
 
     set hass(hass) {
@@ -103,6 +108,7 @@
     _render() {
       const bgType = this._config.background_type || 'illustration';
       const root = this.shadowRoot;
+      this._rendered = true;
 
       root.innerHTML = `<style>
         :host{display:block;padding:4px 0}
