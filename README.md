@@ -4,12 +4,17 @@
 
   [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
 
+  ## Novità 1.7.0
+
+  - Barra di posizione **verticale**, accanto alla finestra, con la maniglia che segue la tapparella
+  - Nuova opzione per scegliere il lato della barra (sinistra o destra) dall'editor
+
   ## Funzionalità
 
   - 📷 **Sfondo telecamera** — mostra il feed live della tua telecamera HA sotto le stecche
   - 🖼️ **Immagine personalizzata** — usa qualsiasi immagine (URL) come sfondo
   - 🎨 **Illustrazione SVG** — sfondo animato di default (come la versione base)
-  - 🎚️ Slider interattivo sulla barra della percentuale
+  - 🎚️ Barra verticale accanto alla finestra, da trascinare per scegliere la posizione (a sinistra o a destra)
   - ⚠️ Avviso finestra aperta con tapparella quasi chiusa
   - 🖊️ Editor visuale completo
 
@@ -61,4 +66,5 @@
   | `camera_entity` | string | Entità telecamera HA |
   | `camera_refresh` | number | Secondi tra aggiornamenti camera (default: 5) |
   | `background_image` | string | URL immagine personalizzata |
+  | `bar_position` | string | `left` / `right` — lato della barra verticale (default: `right`) |
   
